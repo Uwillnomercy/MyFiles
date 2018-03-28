@@ -1,117 +1,47 @@
+//Add modules into todo application
 const program = require('commander');
 const { prompt } = require('inquirer');
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
 
 program
-  .version('0.0.1')
-  .description('This is a TODO application');
+  .version('1.0.0')
+  .description('TODO application');
 
-const storagePath = path.resolve('./store.json');
+const STORAGE_PATH = path.resolve('./store.json');
 const ACCOUNT_ID = 1;
+const { O_APPEND, O_RDONLY, O_CREAT } = fs.constants;
 
+// converts callback based functions of 'fs' module to a Promise-based
+const fsOpen = util.promisify(fs.open);
+const fsReadFile = util.promisify(fs.readFile);
+const fsWriteFile = util.promisify(fs.writeFile);
 
-function openFile() {
-  return new Promise((resolve, reject) => {
-    fs.open(storagePath, 'a+', (err, fd) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve(fd);
-    });
-  });
-}
-
-function readFile() {
-  return new Promise((resolve, reject) => {
-    fs.readFile(storagePath, 'utf8', (err, data) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve(data);
-    });
-  });
-}
-
-function writeFile(data) {
-  return new Promise((resolve, reject) => {
-    fs.writeFile(storagePath, data, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
+//Read the entire content of file,
 function getAllTodos() {
-  return openFile()
-    .then(() => {
-      return readFile();
-    })
+  return fsReadFile(STORAGE_PATH, { encoding: 'utf8', flag: O_RDONLY | O_CREAT })
     .then((data) => {
-      return JSON.parse(data);
+      let jsonText = data;
+      if (!jsonText) jsonText = '{}';
+      return JSON.parse(jsonText);
     })
     .then((storage) => {
-      return storage.todos || [];
+    return storage.todos || [];
+  })
+}
+//file open and saving todo items into the storage
+function saveAllTodos(todos) {
+  return fsOpen(STORAGE_PATH, O_APPEND | O_CREAT)
+    .then(() => {
+      fsWriteFile(STORAGE_PATH, JSON.stringify({ todos }))
     });
 }
-
-function saveAllTodos(todos) {
-  return writeFile(JSON.stringify({ todos }));
-}
-
+//find index of TODO items
 function findTodoIndex(id, todos) {
   return todos.findIndex((todo) => todo.id === id)
 }
-
-function createTodo(data) {
-  return {
-    createdDate: new Date(),
-    createdByUserId: ACCOUNT_ID,
-    description: data.description,
-    id: guid(),
-    title: data.title,
-  };
-}
-
-function addTodo(todo, todos) {
-  return [...todos, todo];
-}
-
-function updateTodo(id, change, todos) {
-  const index = findTodoIndex(id, todos);
-  const currentTodo = todos[index];
-
-  const updatedTodo = {
-    ...currentTodo,
-    ...change,
-    lastUpdateDate: new Date(),
-    lastUpdateByUserId: ACCOUNT_ID,
-    createdDate: currentTodo.createdDate,
-    createdByUserId: currentTodo.createdByUserId,
-  };
-
-  const result = [...todos];
-
-  result.splice(index, 1, updatedTodo);
-
-  return result;
-}
-
-function removeTodo(id, todos) {
-  const index = findTodoIndex(id, todos);
-  const result = [...todos];
-  result.splice(index, 1);
-  return result;
-}
-
+//function to create unique ID for todo element
 function guid() {
   function s4() {
     return Math.floor((1 + Math.random()) * 0x10000)
@@ -120,8 +50,66 @@ function guid() {
   }
   return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
 }
+//represents information into console
+function inform(...args) {
+  console.info(...args);
+}
+//creates todo elements and return actual information about todo elements
+function createTodo(data) {
+  const now = new Date();
+  return {
+    comment: null,
+    createdDate: now,
+    createdByUserId: ACCOUNT_ID,
+    id: guid(),
+    isLiked:false,
+    lastUpdateDate: now,
+    lastUpdateByUserId: ACCOUNT_ID,
+    ...data,
+  };
+}
+//add todo element to storage
+function addTodo(todo, todos) {
+  return [...todos, todo];
+}
+//updates todo information about todo element
+function updateTodo(id, change, todos) {
+  const index = findTodoIndex(id, todos);
+  if (index === -1) throw e
+  const currentTodo = todos[index];
+  const updatedTodo = {
+    ...currentTodo,
+    ...change,
+    lastUpdateDate: new Date(),
+    lastUpdateByUserId: ACCOUNT_ID,
+    createdDate: currentTodo.createdDate,
+    createdByUserId: currentTodo.createdByUserId,
+  };
+  const result = [...todos];
+  result.splice(index, 1, updatedTodo);
+  return result;
+}
+//removing todo element from the storage
+function removeTodoItem(id) {
+  return getAllTodos()
+    .then((todos) => {
+      const index = findTodoIndex(id, todos);
+      if (index === -1) throw e;
+      const result = [...todos];
+      const removedItems = result.splice(index, 1);
+      return saveAllTodos(result).then(() => removedItems.length);
+    });
+}
+//reading information about todo element
+function readTodo(id) {
+  return getAllTodos()
+  .then((todos) => {
+  const index = findTodoIndex(id, todos);
+  if (index === -1) throw e;
+  return todos[index];
+});
+}
 
-// Craft questions to present to users
 const createQuestions = [
   {
     type : 'input',
@@ -155,108 +143,125 @@ const commentQuestions = [
     message : 'Enter comment ...'
   },
 ];
-
+//command to create new todo items
 program
   .command('create')
-  .alias('cr')
   .description('Create new TODO item')
   .action(() => {
     let receivedAnswers;
-
     prompt(createQuestions)
       .then((answers) => {
         receivedAnswers = answers;
         return getAllTodos();
       })
       .then((todos) => {
-        const todo = createTodo(receivedAnswers);
+        const todo = createTodo({
+          title: receivedAnswers.title,
+          description: receivedAnswers.description,
+        });
         const updatedTodos = addTodo(todo, todos);
         return saveAllTodos(updatedTodos).then(() => todo.id);
       })
-      .then((newTodoId) => console.log(newTodoId))
+      .then(inform)
       .catch((error) => {
         throw error;
       });
   });
-
+//updating information about todo items
 program
   .command('update <id>')
-  .alias('upd')
   .description('Update TODO item')
   .action((id) => {
     let receiveAnswers;
-
     prompt(updateQuestions)
-      .then(answers => {
-        receiveAnswers = answers;
+      .then((answers) => {
+        newAnswers = answers;
         return getAllTodos();
       })
       .then((todos) => {
-        const result = updateTodo(id, receiveAnswers, todos);
+        const result = updateTodo(id, {
+          title: newAnswers.title,
+          description: newAnswers.description,
+        }, todos);
         return saveAllTodos(result).then(() => id);
       })
-      .then((updatedTodoId) => {
-        console.log(updatedTodoId);
-      })
+      .then(inform)
       .catch((e) => {
-        throw e;
+        console.info(`Can't update TODO - TODO not found`);
       });
   });
-
+//command that removes todo items from the storage and shows it's ID to console
 program
   .command('remove <id>')
   .alias('rm')
   .description('Remove TODO item by id')
   .action((id) => {
-    getAllTodos()
-      .then((todos) => {
-        const result = removeTodo(id, todos);
-        return saveAllTodos(result).then(() => id);
-      })
-      .then((updatedTodoId) => {
-        console.log(updatedTodoId);
-      })
+    removeTodoItem(id)
+      .then(inform)
       .catch((e) => {
-        throw e;
+        console.info(`There is no TODO with this id`);
       });
   });
-
+//shows all todo items from the storage
 program
   .command('list')
-  .alias('ls')
   .description('List all TODOs')
   .action(() => {
-    getAllTodos()
-      .then((todos) => {
-        console.log(todos);
-      })
+    getAllTodos().then(inform)
   });
-
+// read the information about Todo item and represents it to console in Json format
+program
+  .command('read <id>')
+  .description('Read the actual TODO item by id')
+  .action((id) => {
+    readTodo(id)
+    .then(inform)
+    .catch ((e) => {
+      console.info(`TODO item not found`);
+    });
+  });
+// command to mark todo item as liked;
 program
   .command('like <id>')
-  .alias('lk')
   .description('Like TODO item')
   .action((id) => {
     getAllTodos()
       .then((todos) => {
-        const result = updateTodo(id, { isLiked: true, createdDate: new Date() }, todos);
-        return saveAllTodos(result).then(() => id);
+        const result = updateTodo(id, { isLiked: true }, todos);
+        return saveAllTodos(result).then(() => result[findTodoIndex(id, result)]);
       })
-      .then((updatedTodoId) => {
-        console.log(updatedTodoId);
-      })
-      .catch((e) => {
-        throw e;
+        .then((todo)=>{
+         inform(todo.id);
+         inform (`isLiked:  ${todo.isLiked}`);
+        })
+        .catch((e) => {
+        console.info(`Can't update TODO - TODO not found`);
       });
   });
-
+  // command to mark todo item as unliked;
+  program
+    .command('unlike <id>')
+    .description('Unlike TODO item')
+    .action((id) => {
+      getAllTodos()
+        .then((todos) => {
+          const result = updateTodo(id, { isLiked: false }, todos);
+          return saveAllTodos(result).then(() => result[findTodoIndex(id, result)]);
+        })
+          .then((todo)=>{
+           inform(todo.id);
+           inform (`isLiked: ${todo.isLiked}`);
+         })
+        .catch((e) => {
+          console.info(`Can't update TODO - TODO not found`);
+        });
+    });
+//gives oportunity to comment todo item by it's ID
 program
   .command('comment <id>')
-  .alias('cmt')
   .description('Comment TODO item')
   .action((id) => {
     let receivedAnswers;
-
     prompt(commentQuestions)
       .then((answers) => {
         receivedAnswers = answers;
@@ -266,11 +271,9 @@ program
         const result = updateTodo(id, { comment: receivedAnswers.comment }, todos);
         return saveAllTodos(result).then(() => id);
       })
-      .then((updatedTodoId) => {
-        console.log(updatedTodoId);
-      })
+      .then(inform)
       .catch((e) => {
-        throw e;
+      console.info(`Can't update TODO - TODO not found`);
       });
   });
 
