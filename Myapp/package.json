@@ -1,21 +1,31 @@
 {
-  "name": "todosapp",
+  "name": "myapp",
   "version": "1.0.0",
-  "description": "TODO application",
+  "description": "Todo application",
   "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
   "dependencies": {
     "commander": "^2.15.1",
     "fs": "^0.0.1-security",
-    "inquirer": "^5.1.0",
+    "inquirer": "^5.2.0",
     "path": "^0.12.7",
     "util": "^0.10.3"
   },
   "devDependencies": {},
-  "scripts":
-  {
-    "test": "echo \"Error: no test specified\" && exit 1"
-    },
-
+  "scripts": {
+    "test": "No test",
+    "todos": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Uwillnomercy/MyFiles/tree/master/Myapp"
+  },
+  "keywords": [
+    "Todo",
+    "app"
+  ],
   "author": "Andrei",
   "license": "ISC"
 }
