@@ -19,7 +19,7 @@ const fsOpen = util.promisify(fs.open);
 const fsReadFile = util.promisify(fs.readFile);
 const fsWriteFile = util.promisify(fs.writeFile);
 
-//Read the entire content of file, and return
+//Read the entire content of file
 function getAllTodos() {
   return fsReadFile(STORAGE_PATH, { encoding: 'utf8', flag: O_RDONLY | O_CREAT })
     .then((data) => {
@@ -28,7 +28,7 @@ function getAllTodos() {
       return JSON.parse(jsonText);
     })
     .then((storage) => {
-    return storage.todos || []; //массив элементов туду;
+    return storage.todos || [];
   })
 }
 //file open and saving todo items into the storage
