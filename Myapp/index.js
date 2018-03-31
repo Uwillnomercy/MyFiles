@@ -12,13 +12,14 @@ program
 const STORAGE_PATH = path.resolve('./store.json');
 const ACCOUNT_ID = 1;
 const { O_APPEND, O_RDONLY, O_CREAT } = fs.constants;
+const TODO_NOT_FOUND = `Todo item not found`;
 
 // converts callback based functions of 'fs' module to a Promise-based
 const fsOpen = util.promisify(fs.open);
 const fsReadFile = util.promisify(fs.readFile);
 const fsWriteFile = util.promisify(fs.writeFile);
 
-//Read the entire content of file,
+//Read the entire content of file, and return
 function getAllTodos() {
   return fsReadFile(STORAGE_PATH, { encoding: 'utf8', flag: O_RDONLY | O_CREAT })
     .then((data) => {
@@ -27,7 +28,7 @@ function getAllTodos() {
       return JSON.parse(jsonText);
     })
     .then((storage) => {
-    return storage.todos || [];
+    return storage.todos || []; //массив элементов туду;
   })
 }
 //file open and saving todo items into the storage
@@ -37,7 +38,7 @@ function saveAllTodos(todos) {
       fsWriteFile(STORAGE_PATH, JSON.stringify({ todos }))
     });
 }
-//find index of TODO items
+//find index of TODO item by it's id in array
 function findTodoIndex(id, todos) {
   return todos.findIndex((todo) => todo.id === id)
 }
@@ -187,7 +188,7 @@ program
       })
       .then(inform)
       .catch((e) => {
-        console.info(`Can't update TODO - TODO not found`);
+        console.info(TODO_NOT_FOUND);
       });
   });
 //command that removes todo items from the storage and shows it's ID to console
@@ -199,7 +200,7 @@ program
     removeTodoItem(id)
       .then(inform)
       .catch((e) => {
-        console.info(`There is no TODO with this id`);
+        console.info(TODO_NOT_FOUND);
       });
   });
 //shows all todo items from the storage
@@ -217,7 +218,7 @@ program
     readTodo(id)
     .then(inform)
     .catch ((e) => {
-      console.info(`TODO item not found`);
+      console.info(TODO_NOT_FOUND);
     });
   });
 // command to mark todo item as liked;
@@ -230,12 +231,12 @@ program
         const result = updateTodo(id, { isLiked: true }, todos);
         return saveAllTodos(result).then(() => result[findTodoIndex(id, result)]);
       })
-        .then((todo)=>{
+        .then((todo) => {
          inform(todo.id);
          inform (`isLiked:  ${todo.isLiked}`);
         })
         .catch((e) => {
-        console.info(`Can't update TODO - TODO not found`);
+        console.info(TODO_NOT_FOUND);
       });
   });
   // command to mark todo item as unliked;
@@ -253,7 +254,7 @@ program
            inform (`isLiked: ${todo.isLiked}`);
          })
         .catch((e) => {
-          console.info(`Can't update TODO - TODO not found`);
+          console.info(TODO_NOT_FOUND);
         });
     });
 //gives oportunity to comment todo item by it's ID
@@ -273,7 +274,7 @@ program
       })
       .then(inform)
       .catch((e) => {
-      console.info(`Can't update TODO - TODO not found`);
+      console.info(TODO_NOT_FOUND);
       });
   });
 
