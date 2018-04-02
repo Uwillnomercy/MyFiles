@@ -173,7 +173,7 @@ program
   .command('update <id>')
   .description('Update TODO item')
   .action((id) => {
-    let receiveAnswers;
+    let newAnswers;
     prompt(updateQuestions)
       .then((answers) => {
         newAnswers = answers;
